@@ -1,0 +1,44 @@
+.map-wrapper {
+  display: grid;
+  grid: repeat(4, 100px) / repeat(4, 100px);
+  align-items: center;
+  justify-items: center;
+}
+
+.map-square {
+  width: 90%;
+  height: 90%;
+  background: #a8dadc;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.H {
+  background: #457b9d;
+}
+
+.G::after {
+  content: "";
+  display: block;
+  width: 80%;
+  height: 80%;
+  border-radius: 50%;
+  background: #e3b23c !important;
+}
+
+.selected::after {
+  content: "";
+  display: block;
+  width: 70%;
+  height: 70%;
+  border-radius: 50%;
+  background: #e63946 !important;
+}
+
+.map-letter {
+  font-size: xx-large;
+  font-family: Verdana, Geneva, Tahoma, sans-serif;
+  line-height: 80px;
+  text-align: center;
+}
