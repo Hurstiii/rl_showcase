@@ -1,20 +1,63 @@
+import React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import "./FrozenLake.css";
-import TestAgent from "./TestAgent";
+import styled, { css } from "styled-components";
+import Environment from "./Environment";
 
-enum Direction {
+/**
+ * Enum actions for the environment to given them more readability/meaning than just numbers.
+ */
+enum Actions {
   Up,
   Right,
   Down,
   Left,
 }
 
+/**
+ * Styled components.
+ */
+const MapWrapper = styled.div`
+  display: grid;
+  grid: repeat(4, 100px) / repeat(4, 100px);
+  align-items: center;
+  justify-items: center;
+  flex-basis: 400px;
+`;
+const MapSquare = styled.div`
+  width: 90%;
+  height: 90%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  ${({ type }: { type: "Hole" | "Ice" | "Goal" }) => {
+    if (type === "Hole")
+      return css`
+        background: #457b9d;
+      `;
+    else if (type === "Goal")
+      return css`
+        background: #e3b23c;
+      `;
+    else
+      return css`
+        background: #a8dadc;
+      `;
+  }};
+`;
+
+/**
+ * Props for the FrozenLake environment.
+ */
 interface Props {
   mapSize?: 4;
   p?: number;
   isSlippery?: boolean;
 }
 
+/**
+ * The FrozenLake environment.
+ * @param props Object of props
+ */
 const FrozenLake: React.FC<Props> = ({
   mapSize = 4,
   p = 0.8,
@@ -25,9 +68,6 @@ const FrozenLake: React.FC<Props> = ({
   const observation_space = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] // all possible states
   const [currentSquare, setCurrentSquare] = useState(0); // current state
 
-  // useEffect(() => {
-  //   console.log(`currentSquare = ${currentSquare}`);
-  // }, [currentSquare]);
   // prettier-ignore
   const map = useMemo(() => ['F', 'F', 'F', 'F',
                 'F', 'H', 'H', 'H',
@@ -35,6 +75,9 @@ const FrozenLake: React.FC<Props> = ({
                 'F', 'F', 'F', 'G'], [])
   const [done, setDone] = useState(false);
   console.log("FrozenLake re-rendered");
+
+  const [agentAnimDuraction, setAgentAnimDuration] = useState(0.1);
+  const [speed, setSpeed] = useState(100);
 
   /**
    * Convert a map index to a row and column
@@ -44,9 +87,6 @@ const FrozenLake: React.FC<Props> = ({
     (index: number): [number, number] => {
       let row = Math.floor(index / mapSize);
       let col = index - row * mapSize;
-      // console.log(
-      //   ` IndexToRowsCols: [${row}, ${col}, ${index}], mapSize=${mapSize}`
-      // );
       return [row, col];
     },
     [mapSize]
@@ -76,19 +116,19 @@ const FrozenLake: React.FC<Props> = ({
       var newState = square;
       if (InMap(square, action)) {
         switch (action) {
-          case Direction.Up:
+          case Actions.Up:
             newState = square - mapSize;
             setCurrentSquare(newState);
             break;
-          case Direction.Right:
+          case Actions.Right:
             newState = square + 1;
             setCurrentSquare(newState);
             break;
-          case Direction.Down:
+          case Actions.Down:
             newState = square + mapSize;
             setCurrentSquare(newState);
             break;
-          case Direction.Left:
+          case Actions.Left:
             newState = square - 1;
             setCurrentSquare(newState);
             break;
@@ -109,17 +149,9 @@ const FrozenLake: React.FC<Props> = ({
         tempDone: boolean = done,
         newState: number = currentSquare;
 
-      // console.log(`done = ${tempDone}`);
-
       // check values of done and reward based on current square
       if (!tempDone) {
-        // console.log(`square before move ${currentSquare}`);
-        // Move
         newState = Move(currentSquare, action);
-        // console.log(
-        //   `Step: .Move(${Direction[action]}) | obs_space=${newState}`
-        // );
-        // console.log(`square after move ${newState}`);
         let letter = map[newState];
         if ("HG".includes(letter)) {
           tempDone = true;
@@ -129,11 +161,11 @@ const FrozenLake: React.FC<Props> = ({
         if ("G".includes(letter)) {
           reward = 1; // positive reward for reaching goal
         } else if ("H".includes(letter)) {
-          reward = -1; // negative reward for falling in a hole
+          reward = 0; // negative reward for falling in a hole
         }
 
         if (newState === currentSquare) {
-          reward = -1; // negative reward for going off map
+          reward = 0; // negative reward for going off map
         }
       } else {
         console.warn(
@@ -155,36 +187,94 @@ const FrozenLake: React.FC<Props> = ({
     setDone(false);
   };
 
-  // /**
-  //  * triggers on change in 'done', and calls for a Reset of the Enviroment, and by extension the Agent too.
-  //  */
-  // useEffect(() => {
-  //   if (done) {
-  //     console.log(" done effect");
-  //     // Reset();
-  //   }
-  // }, [done]);
+  const handleSpeedChange = (
+    e: React.MouseEvent<HTMLButtonElement, MouseEvent>
+  ) => {
+    if (e.currentTarget.id === "increase-speed") {
+      console.log(`increasing speed`);
+      setSpeed(speed + 20);
+    } else if (e.currentTarget.id === "decrease-speed") {
+      console.log(`decreasing speed`);
+      setSpeed(speed - 20);
+    }
+  };
+
+  useEffect(() => {
+    setAgentAnimDuration(speed / 1000);
+  }, [speed]);
 
   return (
-    <div className="map-wrapper">
-      {map.map((v, i) => {
-        let className = `map-square ${v}`;
-        if (i === currentSquare) {
-          className += ` selected`;
-        }
-        return <div key={i} className={className} id={`map-square-${i}`}></div>;
-      })}
-      <div>
+    <Environment
+      action_space={action_space}
+      state_space={observation_space}
+      Step={Step}
+      Reset={Reset}
+      speed={speed}
+    >
+      {/** The render/visual for this environment */}
+      <div
+        style={{
+          display: "flex",
+          width: "100%",
+          height: "100%",
+        }}
+      >
+        <div
+          style={{
+            position: "relative",
+          }}
+        >
+          <MapWrapper>
+            {map.map((v, i) => {
+              if (v === "H") return <MapSquare key={i} type="Hole" />;
+              else if (v === "G") return <MapSquare key={i} type="Goal" />;
+              else return <MapSquare key={i} type="Ice" />;
+            })}
+          </MapWrapper>
+          <div
+            style={{
+              width: "50px",
+              height: "50px",
+              background: "red",
+              borderRadius: "50%",
+              transitionProperty: "all",
+              transitionDuration: `${agentAnimDuraction}s`,
+              transitionTimingFunction: "ease",
+              position: "absolute",
+              left: `${
+                (currentSquare -
+                  Math.floor(currentSquare / mapSize) * mapSize) *
+                  100 +
+                25
+              }px`,
+              top: `${Math.floor(currentSquare / mapSize) * 100 + 25}px`,
+            }}
+          ></div>
+          <div>{currentSquare}</div>
+        </div>
+        <button id="decrease-speed" onClick={handleSpeedChange}>
+          - Speed
+        </button>
+        <button id="increase-speed" onClick={handleSpeedChange}>
+          + Speed
+        </button>
+        <div>{speed}</div>
+      </div>
+    </Environment>
+  );
+};
+
+/**
+ * Agent={
         <TestAgent
           step={Step}
           action_space={action_space}
           observation_space={observation_space}
           done={done}
           reset={Reset}
+          speed={speed}
         />
-      </div>
-    </div>
-  );
-};
+      }
+ */
 
 export default FrozenLake;

@@ -1,21 +1,34 @@
-import { MouseEvent, useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useState } from "react";
+import Agent from "./Agent";
 
 interface Props {
   step: (action: number) => [number, number, boolean, Object];
   action_space: number[];
-  observation_space: number[];
-  done: boolean;
+  state_space: number[];
   reset: Function;
+  speed: number;
 }
 
 const TestAgent: React.FC<Props> = (props) => {
   const AS = props.action_space;
-  const SS = props.observation_space;
-  const epsilon = 0.1;
-  const alpha = 0.2;
-  const n = 2;
-  const discount = 0.9;
+  const SS = props.state_space;
+  const Step = props.step; // Step callback of the environment.
+  const Reset = props.reset; // Reset callback of the environment.
+  const speed = props.speed; // Delay between agent actions.
 
+  /**
+   * TODO: make prop values so they can be set at the top level and changed.
+   *
+   * Constants used for the learning.
+   */
+  const epsilon = 0.1; // chance used for epsilon-greedy policy.
+  const alpha = 0.2; // learning rate.
+  const n = 5; // number of steps updated.
+  const discount = 0.9; // discount applied on future returns.
+
+  /**
+   * State used for the learning algorithm.
+   */
   const [Q, setQ] = useState(new Map<string, number>()); // Q(s, a) -> estimated state value
   const updateQ = useCallback(
     (k: string, v: number) => {
@@ -23,7 +36,6 @@ const TestAgent: React.FC<Props> = (props) => {
     },
     [Q]
   );
-
   const [pi, setPi] = useState(new Map<string, number>()); // pi(s) -> action
   const updatePi = useCallback(
     (k: string, v: number) => {
@@ -31,30 +43,19 @@ const TestAgent: React.FC<Props> = (props) => {
     },
     [pi]
   );
-
-  const [t, set_t] = useState(0);
-
-  const [tau, setTau] = useState(0);
-  const [T, setT] = useState(Infinity);
-
+  const [t, set_t] = useState(0); // time step agent is on.
+  const [tau, setTau] = useState(0); // tau (step which the agent is updating).
+  const [T, setT] = useState(Infinity); // Termination (step at which the agent terminated)
   const [S, setS] = useState<number[]>([]); // state memory
   const [A, setA] = useState<number[]>([]); // action memory
   const [R, setR] = useState<number[]>([]); // reward memory
 
-  const [simulating, setSimulating] = useState(false);
-  const interval = useRef<NodeJS.Timeout | null>(null);
-
-  const done = props.done;
-  const Step = props.step;
-  const Reset = props.reset;
-
-  const [learning, setLearning] = useState(false);
-
-  const [episodes, setEpisodes] = useState(1);
-  const [speed, setSpeed] = useState(100);
-
+  /**
+   * Util function
+   *
+   * Used to update the policy to be epsilon-greedy w.r.t Q
+   */
   const updateGreedyPi = useCallback(() => {
-    // console.log(Q);
     SS.forEach((s, i) => {
       /**
        * Find all argmax-a Q(s, a)
@@ -68,19 +69,9 @@ const TestAgent: React.FC<Props> = (props) => {
         if (bestValue === undefined)
           throw Error(`Undefined bestValue Q([${s},0]) ${bestValue}`);
         if (currentValue === bestValue) {
-          // if (s === 0) {
-          //   console.log(
-          //     `cV ${currentValue} = bV ${bestValue} for Q(${s},${a})`
-          //   );
-          // }
           bestActions.push(a);
           bestValue = currentValue;
         } else if (currentValue > bestValue) {
-          // if (s === 0) {
-          //   console.log(
-          //     `cV ${currentValue} > bV ${bestValue} for Q(${s},${a})`
-          //   );
-          // }
           bestActions = [a];
           bestValue = currentValue;
         }
@@ -90,11 +81,7 @@ const TestAgent: React.FC<Props> = (props) => {
        * Break ties randomly i.e. choose a random action from bestActions
        */
       var bestAction: number = sampleUniformAction(bestActions);
-      // if (s === 0) {
-      //   console.log(`BREAKING TIES RANDOMLY`);
-      //   console.log(bestActions);
-      //   console.log(bestAction);
-      // }
+
       /**
        * Set pi to be epsilon-greedy
        */
@@ -107,31 +94,16 @@ const TestAgent: React.FC<Props> = (props) => {
       });
     });
 
-    // console.log("Pi = ");
-    // console.log(pi);
-
     console.log("Q = ");
     console.log(Q);
   }, [AS, Q, SS, updatePi]);
 
-  const init = useCallback(() => {
-    SS.forEach((s, i) => {
-      /**
-       * Set Q(s, a) to arbitrary values
-       */
-      AS.forEach((a, ii) => {
-        updateQ(`${s},${a}`, 0);
-        updatePi(`${s},${a}`, 0.25);
-      });
-    });
-
-    // console.log(`init: Q | `);
-    // console.log(Q);
-
-    // console.log(`init: pi | `);
-    // console.log(pi);
-  }, [AS, SS, updateQ, updatePi]);
-
+  /**
+   * Util function
+   *
+   * Used to get an action at state s using the agents policy.
+   * @param s The state to get can action for.
+   */
   const piAction = useCallback(
     (s: number) => {
       let weights = AS.map((a) => {
@@ -145,9 +117,34 @@ const TestAgent: React.FC<Props> = (props) => {
     [AS, pi]
   );
 
+  /**
+   * Required for Agent
+   *
+   * Used to initialize any values the agent needs.
+   */
+  const init = useCallback(() => {
+    SS.forEach((s, i) => {
+      /**
+       * Set Q(s, a) to arbitrary values
+       */
+      AS.forEach((a, ii) => {
+        updateQ(`${s},${a}`, 0);
+        updatePi(`${s},${a}`, 0.25);
+      });
+    });
+
+    S[0] = 0;
+    A[0] = piAction(S[0]);
+    R[0] = 0;
+  }, [AS, SS, updateQ, updatePi, S, A, R, piAction]);
+
+  /**
+   * Required for Agent
+   *
+   * A callback used to reset the agent for a new episode.
+   */
   const newEpisode = useCallback(() => {
     console.log("new Episode Effect ----------------------------------");
-    setEpisodes(episodes + 1);
     setT(Infinity);
     set_t(0);
     setTau(0);
@@ -159,39 +156,20 @@ const TestAgent: React.FC<Props> = (props) => {
     setTimeout(() => {
       Reset();
     }, speed);
-  }, [Reset, episodes, piAction, speed]);
+  }, [Reset, piAction, speed]);
 
   /**
-   * onComponentDidMount
+   * Required for an Agent
+   *
+   * Implements one time step of the agents learning algorithm.
+   * @return Returns true if learning is finished for current episode. Otherwise false.
    */
-  useEffect(() => {
-    console.log("init Effect ----------------------------------");
-    init();
-
-    S[0] = 0;
-    A[0] = piAction(S[0]);
-    R[0] = 0;
-  }, []);
-
-  useEffect(() => {
-    if (done && simulating && !learning) {
-    }
-  }, [done, simulating, learning]);
-
   const learn = useCallback(() => {
-    setLearning(true);
     let localT = T;
     let localTau = tau;
     let localS = [...S];
     let localA = [...A];
     let localR = [...R];
-    // console.log(" ---- Handle Step ----");
-    // console.log(localS);
-    // console.log(localA);
-    // console.log(localR);
-    // console.log(`t=${t}`);
-    // console.log(`tau=${localTau}`);
-    // console.log(`T=${localT}`);
     if (t < localT) {
       let [obs, rew, localDone] = Step(localA[t % (n + 1)]);
       localS[(t + 1) % (n + 1)] = obs;
@@ -206,17 +184,10 @@ const TestAgent: React.FC<Props> = (props) => {
         localA[(t + 1) % (n + 1)] = piAction(obs);
         setA(localA);
       }
-
-      // console.log(` --- Memory after step ---`);
-      // console.log(localS);
-      // console.log(localA);
-      // console.log(localR);
-      // console.log(` ------------------------`);
     }
     localTau = t - n + 1;
     setTau(localTau); // tau is the time whose estimate is being updated
     if (localTau >= 0) {
-      // console.log(`updating tau at ${localTau}`);
       let G = 0;
       for (let i = localTau + 1; i <= Math.min(localTau + n, localT); i++) {
         G = G + Math.pow(discount, i - localTau - 1) * localR[i % (n + 1)];
@@ -243,7 +214,6 @@ const TestAgent: React.FC<Props> = (props) => {
         );
       }
       updatedStateValue += alpha * (G - updatedStateValue);
-      // console.log(updatedStateValue);
       updateQ(
         `${localS[localTau % (n + 1)]},${localA[localTau % (n + 1)]}`,
         updatedStateValue
@@ -251,47 +221,14 @@ const TestAgent: React.FC<Props> = (props) => {
       updateGreedyPi();
     }
     if (localTau === localT - 1) {
-      // console.log(
-      //   `localTau: ${localTau} is equal tp localT - 1: ${localT - 1}`
-      // );
-      if (simulating) {
-        newEpisode();
-      }
-      setLearning(false);
-      return;
+      console.log(`Reached a terminal state returning true`);
+      return true;
     }
     set_t(t + 1);
-    setLearning(false);
-  }, [
-    A,
-    Q,
-    R,
-    S,
-    T,
-    piAction,
-    t,
-    tau,
-    updateGreedyPi,
-    updateQ,
-    Step,
-    newEpisode,
-    simulating,
-  ]);
+    return false;
+  }, [A, Q, R, S, T, piAction, t, tau, updateGreedyPi, updateQ, Step]);
 
-  useEffect(() => {
-    if (simulating) {
-      interval.current = setInterval(() => {
-        learn();
-      }, speed);
-
-      return () => {
-        if (interval.current !== null) {
-          clearInterval(interval.current);
-        }
-      };
-    }
-  }, [simulating, learn, speed]);
-
+  // Util function
   const randomChoice = (weights: number[]): number => {
     var total = 0;
     var cumalitive = weights.map((v) => {
@@ -309,29 +246,20 @@ const TestAgent: React.FC<Props> = (props) => {
     throw Error(`Choice not made`);
   };
 
-  const handleStep = (e: MouseEvent) => {
-    if (!done) {
-      learn();
-    }
-  };
-
-  const handleSimulate = (e: React.MouseEvent) => {
-    let newSimulating = !simulating;
-    setSimulating(newSimulating);
-  };
-
+  // Util function
   const sampleUniformAction = (actions: number[]) => {
     var index = Math.floor(Math.random() * actions.length);
     return actions[index];
   };
 
   return (
-    <div>
-      <button onClick={handleStep}>Step</button>
-      <button onClick={handleSimulate}>Simulate</button>
-      <h2>ep={episodes}</h2>
-      <h2>t={t}</h2>
-    </div>
+    <Agent
+      newEpisode={newEpisode}
+      init={init}
+      learn={learn}
+      speed={speed}
+      timeStep={t}
+    />
   );
 };
 
