@@ -1,7 +1,9 @@
-import React from "react";
+import React, { Ref } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import styled, { css } from "styled-components";
 import Environment from "./Environment";
+import { sampleUniformAction } from "../utils/Utils";
+import { Props as AgentProps } from "./TestAgent";
 
 /**
  * Enum actions for the environment to given them more readability/meaning than just numbers.
@@ -52,6 +54,15 @@ interface Props {
   mapSize?: 4;
   p?: number;
   isSlippery?: boolean;
+  setStep: React.Dispatch<
+    React.SetStateAction<
+      ((action: number) => [number, number, boolean, Object]) | undefined
+    >
+  >;
+  setActionSpace: React.Dispatch<React.SetStateAction<number[] | undefined>>;
+  setStateSpace: React.Dispatch<React.SetStateAction<number[] | undefined>>;
+  setReset: React.Dispatch<React.SetStateAction<(() => void) | undefined>>;
+  speed: number;
 }
 
 /**
@@ -60,12 +71,16 @@ interface Props {
  */
 const FrozenLake: React.FC<Props> = ({
   mapSize = 4,
-  p = 0.8,
   isSlippery = true,
+  setStep,
+  setActionSpace,
+  setStateSpace,
+  setReset,
+  speed,
 }) => {
-  const action_space = [0, 1, 2, 3]; // all possible actions
+  const action_space = useMemo(() => [0, 1, 2, 3], []); // all possible actions
   //prettier-ignore
-  const observation_space = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] // all possible states
+  const observation_space = useMemo(() => [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], []) // all possible states
   const [currentSquare, setCurrentSquare] = useState(0); // current state
 
   // prettier-ignore
@@ -74,10 +89,10 @@ const FrozenLake: React.FC<Props> = ({
                 'F', 'F', 'F', 'F',
                 'F', 'F', 'F', 'G'], [])
   const [done, setDone] = useState(false);
+
   console.log("FrozenLake re-rendered");
 
   const [agentAnimDuraction, setAgentAnimDuration] = useState(0.1);
-  const [speed, setSpeed] = useState(100);
 
   /**
    * Convert a map index to a row and column
@@ -113,7 +128,22 @@ const FrozenLake: React.FC<Props> = ({
 
   const Move = useCallback(
     (square: number, action: number): number => {
+      /**
+       * Chance to take a different action if environment is slippery.
+       */
+      if (isSlippery) {
+        let actions = [
+          (action - 1) % action_space.length,
+          action,
+          (action + 1) % action_space.length,
+        ];
+        action = sampleUniformAction(actions);
+      }
+
       var newState = square;
+      /**
+       * Make move.
+       */
       if (InMap(square, action)) {
         switch (action) {
           case Actions.Up:
@@ -137,7 +167,7 @@ const FrozenLake: React.FC<Props> = ({
       }
       return newState;
     },
-    [InMap, mapSize]
+    [InMap, mapSize, isSlippery, action_space]
   );
 
   /**
@@ -181,27 +211,34 @@ const FrozenLake: React.FC<Props> = ({
   /**
    * Reset the enviroment to the starting values & set reset to trigger the agent to reset for new episode.
    */
-  const Reset = () => {
+  const Reset = useCallback(() => {
     console.log(`-------- Resetting the Enviroment -----------`);
     setCurrentSquare(0);
     setDone(false);
-  };
-
-  const handleSpeedChange = (
-    e: React.MouseEvent<HTMLButtonElement, MouseEvent>
-  ) => {
-    if (e.currentTarget.id === "increase-speed") {
-      console.log(`increasing speed`);
-      setSpeed(speed + 20);
-    } else if (e.currentTarget.id === "decrease-speed") {
-      console.log(`decreasing speed`);
-      setSpeed(speed - 20);
-    }
-  };
+  }, []);
 
   useEffect(() => {
     setAgentAnimDuration(speed / 1000);
   }, [speed]);
+
+  /**
+   * Pass values back to the parent with callbacks and state for the agent.
+   */
+  useEffect(() => {
+    setActionSpace(action_space);
+  }, [action_space, setActionSpace]);
+
+  useEffect(() => {
+    setStateSpace(observation_space);
+  }, [observation_space, setStateSpace]);
+
+  useEffect(() => {
+    setStep(() => Step);
+  }, [Step, setStep]);
+
+  useEffect(() => {
+    setReset(() => Reset);
+  }, [Reset, setReset]);
 
   return (
     <Environment
@@ -232,6 +269,7 @@ const FrozenLake: React.FC<Props> = ({
             })}
           </MapWrapper>
           <div
+            id="Agent"
             style={{
               width: "50px",
               height: "50px",
@@ -250,15 +288,7 @@ const FrozenLake: React.FC<Props> = ({
               top: `${Math.floor(currentSquare / mapSize) * 100 + 25}px`,
             }}
           ></div>
-          <div>{currentSquare}</div>
         </div>
-        <button id="decrease-speed" onClick={handleSpeedChange}>
-          - Speed
-        </button>
-        <button id="increase-speed" onClick={handleSpeedChange}>
-          + Speed
-        </button>
-        <div>{speed}</div>
       </div>
     </Environment>
   );

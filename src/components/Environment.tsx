@@ -21,18 +21,7 @@ export const Environment: React.FC<Props> = ({
   speed,
   children,
 }) => {
-  return (
-    <div>
-      {children}
-      <TestAgent
-        step={Step}
-        action_space={action_space}
-        state_space={state_space}
-        reset={Reset}
-        speed={speed}
-      />
-    </div>
-  );
+  return <div>{children}</div>;
 };
 
 export default Environment;

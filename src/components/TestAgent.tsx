@@ -1,12 +1,39 @@
 import React, { useCallback, useState } from "react";
 import Agent from "./Agent";
+import { sampleUniformAction, randomChoice } from "../utils/Utils";
 
-interface Props {
+export interface Props {
   step: (action: number) => [number, number, boolean, Object];
   action_space: number[];
   state_space: number[];
   reset: Function;
   speed: number;
+  t: number;
+  set_t: React.Dispatch<React.SetStateAction<number>>;
+  T: number;
+  setT: React.Dispatch<React.SetStateAction<number>>;
+  tau: number;
+  setTau: React.Dispatch<React.SetStateAction<number>>;
+  Q: Map<string, number>;
+  updateQ: (k: string, v: number) => void;
+  pi: Map<string, number>;
+  updatePi: (k: string, v: number) => void;
+  A: number[];
+  setA: React.Dispatch<React.SetStateAction<number[]>>;
+  S: number[];
+  setS: React.Dispatch<React.SetStateAction<number[]>>;
+  R: number[];
+  setR: React.Dispatch<React.SetStateAction<number[]>>;
+  simulating: boolean;
+  setSimulating: React.Dispatch<React.SetStateAction<boolean>>;
+  episodes: number;
+  setEpisodes: React.Dispatch<React.SetStateAction<number>>;
+  setHandleStep: React.Dispatch<
+    React.SetStateAction<((e: React.MouseEvent) => void) | undefined>
+  >;
+  setHandleSimulate: React.Dispatch<
+    React.SetStateAction<((e: React.MouseEvent) => void) | undefined>
+  >;
 }
 
 const TestAgent: React.FC<Props> = (props) => {
@@ -14,8 +41,17 @@ const TestAgent: React.FC<Props> = (props) => {
   const SS = props.state_space;
   const Step = props.step; // Step callback of the environment.
   const Reset = props.reset; // Reset callback of the environment.
-  const speed = props.speed; // Delay between agent actions.
+  //prettier-ignore
+  const {speed, t, set_t, T, setT, tau, setTau, Q, updateQ, pi, updatePi, A, setA, S, setS, R, setR} = props;
 
+  const {
+    simulating,
+    setSimulating,
+    episodes,
+    setEpisodes,
+    setHandleStep,
+    setHandleSimulate,
+  } = props;
   /**
    * TODO: make prop values so they can be set at the top level and changed.
    *
@@ -25,30 +61,6 @@ const TestAgent: React.FC<Props> = (props) => {
   const alpha = 0.2; // learning rate.
   const n = 5; // number of steps updated.
   const discount = 0.9; // discount applied on future returns.
-
-  /**
-   * State used for the learning algorithm.
-   */
-  const [Q, setQ] = useState(new Map<string, number>()); // Q(s, a) -> estimated state value
-  const updateQ = useCallback(
-    (k: string, v: number) => {
-      setQ(new Map(Q.set(k, v)));
-    },
-    [Q]
-  );
-  const [pi, setPi] = useState(new Map<string, number>()); // pi(s) -> action
-  const updatePi = useCallback(
-    (k: string, v: number) => {
-      setPi(new Map(pi.set(k, v)));
-    },
-    [pi]
-  );
-  const [t, set_t] = useState(0); // time step agent is on.
-  const [tau, setTau] = useState(0); // tau (step which the agent is updating).
-  const [T, setT] = useState(Infinity); // Termination (step at which the agent terminated)
-  const [S, setS] = useState<number[]>([]); // state memory
-  const [A, setA] = useState<number[]>([]); // action memory
-  const [R, setR] = useState<number[]>([]); // reward memory
 
   /**
    * Util function
@@ -156,7 +168,7 @@ const TestAgent: React.FC<Props> = (props) => {
     setTimeout(() => {
       Reset();
     }, speed);
-  }, [Reset, piAction, speed]);
+  }, [Reset, piAction, setA, setR, setS, setT, setTau, set_t, speed]);
 
   /**
    * Required for an Agent
@@ -226,31 +238,25 @@ const TestAgent: React.FC<Props> = (props) => {
     }
     set_t(t + 1);
     return false;
-  }, [A, Q, R, S, T, piAction, t, tau, updateGreedyPi, updateQ, Step]);
-
-  // Util function
-  const randomChoice = (weights: number[]): number => {
-    var total = 0;
-    var cumalitive = weights.map((v) => {
-      total += v;
-      return total;
-    });
-
-    var r = Math.random() * total;
-    for (var i = 0; i < cumalitive.length; i++) {
-      if (r < cumalitive[i]) {
-        return i;
-      }
-    }
-
-    throw Error(`Choice not made`);
-  };
-
-  // Util function
-  const sampleUniformAction = (actions: number[]) => {
-    var index = Math.floor(Math.random() * actions.length);
-    return actions[index];
-  };
+  }, [
+    T,
+    tau,
+    S,
+    A,
+    R,
+    t,
+    setTau,
+    set_t,
+    Step,
+    setS,
+    setR,
+    setT,
+    piAction,
+    setA,
+    Q,
+    updateQ,
+    updateGreedyPi,
+  ]);
 
   return (
     <Agent
@@ -258,7 +264,12 @@ const TestAgent: React.FC<Props> = (props) => {
       init={init}
       learn={learn}
       speed={speed}
-      timeStep={t}
+      simulating={simulating}
+      setSimulating={setSimulating}
+      episodes={episodes}
+      setEpisodes={setEpisodes}
+      setHandleStep={setHandleStep}
+      setHandleSimulate={setHandleSimulate}
     />
   );
 };
