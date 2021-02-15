@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import Agent from "./Agent";
 import { sampleUniformAction, randomChoice } from "../utils/Utils";
 
@@ -28,6 +28,11 @@ export interface Props {
   setSimulating: React.Dispatch<React.SetStateAction<boolean>>;
   episodes: number;
   setEpisodes: React.Dispatch<React.SetStateAction<number>>;
+  n: number;
+  epsilon: number;
+  discount: number;
+  alpha: number;
+  setAgentInit: React.Dispatch<React.SetStateAction<(() => void) | undefined>>;
   setHandleStep: React.Dispatch<
     React.SetStateAction<((e: React.MouseEvent) => void) | undefined>
   >;
@@ -51,16 +56,12 @@ const TestAgent: React.FC<Props> = (props) => {
     setEpisodes,
     setHandleStep,
     setHandleSimulate,
+    n,
+    epsilon,
+    discount,
+    alpha,
+    setAgentInit,
   } = props;
-  /**
-   * TODO: make prop values so they can be set at the top level and changed.
-   *
-   * Constants used for the learning.
-   */
-  const epsilon = 0.1; // chance used for epsilon-greedy policy.
-  const alpha = 0.2; // learning rate.
-  const n = 5; // number of steps updated.
-  const discount = 0.9; // discount applied on future returns.
 
   /**
    * Util function
@@ -108,7 +109,7 @@ const TestAgent: React.FC<Props> = (props) => {
 
     console.log("Q = ");
     console.log(Q);
-  }, [AS, Q, SS, updatePi]);
+  }, [AS, Q, SS, updatePi, epsilon]);
 
   /**
    * Util function
@@ -149,6 +150,10 @@ const TestAgent: React.FC<Props> = (props) => {
     A[0] = piAction(S[0]);
     R[0] = 0;
   }, [AS, SS, updateQ, updatePi, S, A, R, piAction]);
+
+  useEffect(() => {
+    setAgentInit(() => init);
+  }, [init, setAgentInit]);
 
   /**
    * Required for Agent
@@ -238,25 +243,7 @@ const TestAgent: React.FC<Props> = (props) => {
     }
     set_t(t + 1);
     return false;
-  }, [
-    T,
-    tau,
-    S,
-    A,
-    R,
-    t,
-    setTau,
-    set_t,
-    Step,
-    setS,
-    setR,
-    setT,
-    piAction,
-    setA,
-    Q,
-    updateQ,
-    updateGreedyPi,
-  ]);
+  }, [T, tau, S, A, R, t, n, setTau, set_t, Step, setS, setR, setT, piAction, setA, Q, alpha, updateQ, updateGreedyPi, discount]); //prettier-ignore
 
   return (
     <Agent

@@ -3,7 +3,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import styled, { css } from "styled-components";
 import Environment from "./Environment";
 import { sampleUniformAction } from "../utils/Utils";
-import { Props as AgentProps } from "./TestAgent";
 
 /**
  * Enum actions for the environment to given them more readability/meaning than just numbers.
@@ -31,19 +30,22 @@ const MapSquare = styled.div`
   display: flex;
   justify-content: center;
   align-items: center;
-  ${({ type }: { type: "Hole" | "Ice" | "Goal" }) => {
-    if (type === "Hole")
-      return css`
-        background: #457b9d;
-      `;
-    else if (type === "Goal")
-      return css`
-        background: #e3b23c;
-      `;
-    else
-      return css`
-        background: #a8dadc;
-      `;
+  ${({
+    type,
+    selected,
+  }: {
+    type: "Hole" | "Ice" | "Goal";
+    selected: boolean;
+  }) => {
+    var background;
+    if (type === "Hole") background = "#457b9d";
+    else if (type === "Goal") background = "#e3b23c";
+    else background = "#a8dadc";
+
+    return css`
+      ${background ? `background: ${background}` : ``};
+      ${selected ? `border: solid 1px red` : ``}
+    `;
   }};
 `;
 
@@ -63,6 +65,7 @@ interface Props {
   setStateSpace: React.Dispatch<React.SetStateAction<number[] | undefined>>;
   setReset: React.Dispatch<React.SetStateAction<(() => void) | undefined>>;
   speed: number;
+  setSelectedSquare: React.Dispatch<React.SetStateAction<number>>;
 }
 
 /**
@@ -77,11 +80,14 @@ const FrozenLake: React.FC<Props> = ({
   setStateSpace,
   setReset,
   speed,
+  setSelectedSquare,
 }) => {
   const action_space = useMemo(() => [0, 1, 2, 3], []); // all possible actions
   //prettier-ignore
   const observation_space = useMemo(() => [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], []) // all possible states
   const [currentSquare, setCurrentSquare] = useState(0); // current state
+
+  const [localSelectedSquare, setLocalSelectedSquare] = useState(0);
 
   // prettier-ignore
   const map = useMemo(() => ['F', 'F', 'F', 'F',
@@ -90,7 +96,7 @@ const FrozenLake: React.FC<Props> = ({
                 'F', 'F', 'F', 'G'], [])
   const [done, setDone] = useState(false);
 
-  console.log("FrozenLake re-rendered");
+  // console.log("FrozenLake re-rendered");
 
   const [agentAnimDuraction, setAgentAnimDuration] = useState(0.1);
 
@@ -263,9 +269,42 @@ const FrozenLake: React.FC<Props> = ({
         >
           <MapWrapper>
             {map.map((v, i) => {
-              if (v === "H") return <MapSquare key={i} type="Hole" />;
-              else if (v === "G") return <MapSquare key={i} type="Goal" />;
-              else return <MapSquare key={i} type="Ice" />;
+              if (v === "H")
+                return (
+                  <MapSquare
+                    key={i}
+                    type="Hole"
+                    onClick={() => {
+                      setSelectedSquare(i);
+                      setLocalSelectedSquare(i);
+                    }}
+                    selected={localSelectedSquare === i}
+                  />
+                );
+              else if (v === "G")
+                return (
+                  <MapSquare
+                    key={i}
+                    type="Goal"
+                    onClick={() => {
+                      setSelectedSquare(i);
+                      setLocalSelectedSquare(i);
+                    }}
+                    selected={localSelectedSquare === i}
+                  />
+                );
+              else
+                return (
+                  <MapSquare
+                    key={i}
+                    type="Ice"
+                    onClick={() => {
+                      setSelectedSquare(i);
+                      setLocalSelectedSquare(i);
+                    }}
+                    selected={localSelectedSquare === i}
+                  />
+                );
             })}
           </MapWrapper>
           <div
