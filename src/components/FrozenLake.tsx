@@ -19,7 +19,7 @@ enum Actions {
  */
 const MapWrapper = styled.div`
   display: grid;
-  grid: repeat(4, 100px) / repeat(4, 100px);
+  grid: repeat(4, 200px) / repeat(4, 200px);
   align-items: center;
   justify-items: center;
   flex-basis: 400px;
@@ -30,6 +30,7 @@ const MapSquare = styled.div`
   display: flex;
   justify-content: center;
   align-items: center;
+  box-shadow: -5px 5px 1px -1px rgba(0, 0, 0, 0.1);
   ${({
     type,
     selected,
@@ -74,7 +75,7 @@ interface Props {
  */
 const FrozenLake: React.FC<Props> = ({
   mapSize = 4,
-  isSlippery = true,
+  isSlippery = false,
   setStep,
   setActionSpace,
   setStateSpace,
@@ -138,6 +139,7 @@ const FrozenLake: React.FC<Props> = ({
        * Chance to take a different action if environment is slippery.
        */
       if (isSlippery) {
+        console.log(`Slippery action choice`);
         let actions = [
           (action - 1) % action_space.length,
           action,
@@ -255,13 +257,7 @@ const FrozenLake: React.FC<Props> = ({
       speed={speed}
     >
       {/** The render/visual for this environment */}
-      <div
-        style={{
-          display: "flex",
-          width: "100%",
-          height: "100%",
-        }}
-      >
+      <div>
         <div
           style={{
             position: "relative",
@@ -310,21 +306,22 @@ const FrozenLake: React.FC<Props> = ({
           <div
             id="Agent"
             style={{
-              width: "50px",
-              height: "50px",
+              width: "100px",
+              height: "100px",
               background: "red",
               borderRadius: "50%",
               transitionProperty: "all",
               transitionDuration: `${agentAnimDuraction}s`,
               transitionTimingFunction: "ease",
               position: "absolute",
+              boxShadow: "-5px 5px 1px -1px rgba(0, 0, 0, 0.2)",
               left: `${
                 (currentSquare -
                   Math.floor(currentSquare / mapSize) * mapSize) *
-                  100 +
-                25
+                  200 +
+                50
               }px`,
-              top: `${Math.floor(currentSquare / mapSize) * 100 + 25}px`,
+              top: `${Math.floor(currentSquare / mapSize) * 200 + 50}px`,
             }}
           ></div>
         </div>

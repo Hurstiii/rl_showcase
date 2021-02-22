@@ -2,6 +2,14 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 100vh;
-  width: 100vw;
+  height: calc(100vh - 2 * 2em);
+  width: calc(100vw - 2 * 2em);
+  padding: 2em;
+
+  background: linear-gradient(
+      45deg,
+      rgba(256, 256, 256, 0.65),
+      rgba(256, 256, 256, 0.85)
+    ),
+    linear-gradient(45deg, #6e90ff, #bf6dfc);
 }

@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { TestAgentState } from "./TestAgent";
 
 export interface Props {
-  newEpisode: () => void; // a callback to reset the agent for a new episode.
+  newEpisode: (context: TestAgentState) => void; // a callback to reset the agent for a new episode.
   init: () => void; // a callback to intialise the agent. Called onComponentDidMount.
-  learn: () => boolean; // the main callback that will implement the aglorithm of the agent. Called when step button pressed etc...
+  learn: () => { done: boolean; context: TestAgentState }; // the main callback that will implement the aglorithm of the agent. Called when step button pressed etc...
   speed: number; // the delay between agent actions.
   simulating: boolean;
   setSimulating: React.Dispatch<React.SetStateAction<boolean>>;
@@ -32,8 +33,10 @@ export const Agent: React.FC<Props> = ({
   setEpisodes,
   setHandleStep,
   setHandleSimulate,
+  children,
 }) => {
   const interval = useRef<NodeJS.Timeout | null>(null); // remembers the interval that was set.
+  const intervals = useRef(0);
 
   /**
    * Handles a click of the step button.
@@ -41,10 +44,9 @@ export const Agent: React.FC<Props> = ({
    */
   const handleSimulate = useCallback(
     (e: React.MouseEvent) => {
-      let newSimulating = !simulating;
-      setSimulating(newSimulating);
+      setSimulating((simulating) => !simulating);
     },
-    [setSimulating, simulating]
+    [setSimulating]
   );
 
   /**
@@ -54,12 +56,13 @@ export const Agent: React.FC<Props> = ({
   const handleStep = useCallback(
     (e: React.MouseEvent) => {
       if (simulating) return;
-      if (learn()) {
-        newEpisode();
-        setEpisodes(episodes + 1);
+      const { done, context } = learn();
+      if (done) {
+        newEpisode(context);
+        setEpisodes((episodes) => episodes + 1);
       }
     },
-    [episodes, learn, newEpisode, setEpisodes, simulating]
+    [learn, newEpisode, setEpisodes, simulating]
   );
 
   /**
@@ -75,22 +78,26 @@ export const Agent: React.FC<Props> = ({
    */
   useEffect(() => {
     if (simulating) {
+      intervals.current += 1;
+      // console.log(`Setting interval ${intervals.current}`);
       interval.current = setInterval(() => {
-        if (learn()) {
+        const { done, context } = learn();
+        if (done) {
           if (simulating) {
-            newEpisode();
-            setEpisodes(episodes + 1);
+            newEpisode(context);
+            setEpisodes((episodes) => episodes + 1);
           }
         }
       }, speed);
 
       return () => {
         if (interval.current !== null) {
+          // console.log(`Clearing interval ${intervals.current}`);
           clearInterval(interval.current);
         }
       };
     }
-  }, [simulating, learn, speed, newEpisode, episodes, setEpisodes]);
+  }, [simulating, learn, newEpisode, setEpisodes, speed]);
 
   useEffect(() => {
     setHandleStep(() => handleStep);
@@ -100,7 +107,7 @@ export const Agent: React.FC<Props> = ({
     setHandleSimulate(() => handleSimulate);
   }, [setHandleSimulate, handleSimulate]);
 
-  return <></>;
+  return <>{children}</>;
 };
 
 export default Agent;
