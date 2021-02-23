@@ -1,4 +1,4 @@
-import { createMuiTheme, MuiThemeProvider } from "@material-ui/core";
+import { createMuiTheme, MuiThemeProvider, Paper } from "@material-ui/core";
 import { blue, green, purple, red } from "@material-ui/core/colors";
 import React, { useState } from "react";
 import { ThemeProvider } from "styled-components";
@@ -12,8 +12,19 @@ function App() {
   return (
     <MuiThemeProvider theme={theme}>
       <div className="App">
-        <header className="App-header"></header>
-        <Simulation />
+        <Paper
+          elevation={2}
+          className="App-header"
+          style={{
+            width: "100%",
+            minHeight: "50px",
+            backgroundColor: "#6889f2",
+          }}
+          square={true}
+        ></Paper>
+        <main className="showcase">
+          <Simulation />
+        </main>
       </div>
     </MuiThemeProvider>
   );

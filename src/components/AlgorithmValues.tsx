@@ -22,7 +22,7 @@ const useStyles = makeStyles({
     tableLayout: "fixed",
   },
   tableContainer: {
-    // borderRadius: 0,
+    height: "fit-content",
   },
 });
 

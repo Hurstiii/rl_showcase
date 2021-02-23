@@ -29,7 +29,20 @@ import { NONAME } from "dns";
 //   boxShadow: "1px 0 2px -1px #000",
 // },
 
-const Colors: PaletteOptions | undefined = {
+export const ColorValues = {
+  primary: {
+    main: "#6889F2",
+    light: "#6E90FF",
+    dark: "#1B2440",
+  },
+  secondary: {
+    main: "#AB62E3",
+    light: "#BF6DFC",
+    dark: "#5E367D",
+  },
+};
+
+export const Colors: PaletteOptions = {
   primary: {
     main: "#6889F2",
     light: "#6E90FF",
@@ -57,17 +70,14 @@ const createAppTheme = (theme: Theme) =>
     overrides: {
       MuiTableHead: {
         root: {
-          background: theme.palette.secondary.main,
+          background: theme.palette.primary.main,
           boxShadow: "2px 0 6px -3px #000",
           zIndex: 2,
         },
       },
       MuiTableCell: {
-        head: { color: theme.palette.secondary.contrastText, fontWeight: 700 },
-        body: {
-          background: theme.palette.secondary.light,
-          color: theme.palette.secondary.contrastText,
-        },
+        head: { color: theme.palette.primary.contrastText, fontWeight: 700 },
+        body: { background: "#fff" },
         root: { borderBottom: "solid 1px rgba(0,0,0,0.2)", fontSize: "1rem" },
       },
       MuiTableRow: {

@@ -3,6 +3,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import styled, { css } from "styled-components";
 import Environment from "./Environment";
 import { sampleUniformAction } from "../utils/Utils";
+import { Box, Hidden, makeStyles } from "@material-ui/core";
+import { relative } from "path";
 
 /**
  * Enum actions for the environment to given them more readability/meaning than just numbers.
@@ -14,23 +16,24 @@ enum Actions {
   Left,
 }
 
+const SquareSize = 150;
+const AgentSize = SquareSize / 2;
+const InfoSize = 38;
+
 /**
  * Styled components.
  */
 const MapWrapper = styled.div`
   display: grid;
-  grid: repeat(4, 200px) / repeat(4, 200px);
+  grid: repeat(4, ${SquareSize}px) / repeat(4, ${SquareSize}px);
   align-items: center;
   justify-items: center;
-  flex-basis: 400px;
 `;
 const MapSquare = styled.div`
-  width: 90%;
-  height: 90%;
   display: flex;
   justify-content: center;
   align-items: center;
-  box-shadow: -5px 5px 1px -1px rgba(0, 0, 0, 0.1);
+  transition: all ease-out 0.15s;
   ${({
     type,
     selected,
@@ -45,10 +48,47 @@ const MapSquare = styled.div`
 
     return css`
       ${background ? `background: ${background}` : ``};
-      ${selected ? `border: solid 1px red` : ``}
+      ${selected
+        ? `box-shadow: -7px 7px 1px -1px rgba(0, 0, 0, 0.1); width: 95%; height: 95%;`
+        : `box-shadow: -5px 5px 1px -1px rgba(0, 0, 0, 0.1); width: 90%; height: 90%;`}
     `;
   }};
 `;
+
+const useStyles = makeStyles({
+  InfoBubble: {
+    width: `${InfoSize}px`,
+    height: `${InfoSize}px`,
+    background: "#ffffff66",
+    borderRadius: "50%",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    fontSize: "0.8rem",
+    fontWeight: 300,
+  },
+  InfoBox: {
+    position: "absolute",
+    justifyContent: "center",
+    display: "flex",
+    overflow: "hidden",
+    transitionProperty: "all",
+    transitionDuration: "0.1s",
+    transitionTimingFunction: "ease-in-out",
+  },
+  InfoBoxHorizontal: {
+    maxWidth: `${SquareSize}px`,
+    width: `${SquareSize}px`,
+    height: `${InfoSize}px`,
+    flexDirection: "row",
+  },
+  InfoBoxVertical: {
+    maxHeight: `${SquareSize}px`,
+    height: `${SquareSize}px`,
+    width: `${InfoSize}px`,
+    flexDirection: "column",
+  },
+});
 
 /**
  * Props for the FrozenLake environment.
@@ -67,6 +107,24 @@ interface Props {
   setReset: React.Dispatch<React.SetStateAction<(() => void) | undefined>>;
   speed: number;
   setSelectedSquare: React.Dispatch<React.SetStateAction<number>>;
+  extraSquareInfo: {
+    up: {
+      label: string;
+      value: string | undefined;
+    }[];
+    right: {
+      label: string;
+      value: string | undefined;
+    }[];
+    down: {
+      label: string;
+      value: string | undefined;
+    }[];
+    left: {
+      label: string;
+      value: string | undefined;
+    }[];
+  };
 }
 
 /**
@@ -82,7 +140,10 @@ const FrozenLake: React.FC<Props> = ({
   setReset,
   speed,
   setSelectedSquare,
+  extraSquareInfo,
 }) => {
+  const classes = useStyles();
+
   const action_space = useMemo(() => [0, 1, 2, 3], []); // all possible actions
   //prettier-ignore
   const observation_space = useMemo(() => [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], []) // all possible states
@@ -248,6 +309,10 @@ const FrozenLake: React.FC<Props> = ({
     setReset(() => Reset);
   }, [Reset, setReset]);
 
+  const getRandomDelay = () => {
+    return Math.random() * 0.0;
+  };
+
   return (
     <Environment
       action_space={action_space}
@@ -306,8 +371,8 @@ const FrozenLake: React.FC<Props> = ({
           <div
             id="Agent"
             style={{
-              width: "100px",
-              height: "100px",
+              width: `${AgentSize}px`,
+              height: `${AgentSize}px`,
               background: "red",
               borderRadius: "50%",
               transitionProperty: "all",
@@ -318,12 +383,111 @@ const FrozenLake: React.FC<Props> = ({
               left: `${
                 (currentSquare -
                   Math.floor(currentSquare / mapSize) * mapSize) *
-                  200 +
-                50
+                  SquareSize +
+                AgentSize / 2
               }px`,
-              top: `${Math.floor(currentSquare / mapSize) * 200 + 50}px`,
+              top: `${
+                Math.floor(currentSquare / mapSize) * SquareSize + AgentSize / 2
+              }px`,
             }}
           ></div>
+          <Box
+            id="ValuesUp"
+            className={`${classes.InfoBoxHorizontal} ${classes.InfoBox}`}
+            style={{
+              left: `${
+                (localSelectedSquare -
+                  Math.floor(localSelectedSquare / mapSize) * mapSize) *
+                SquareSize
+              }px`,
+              top: `${
+                -28 + Math.floor(localSelectedSquare / mapSize) * SquareSize
+              }px`,
+              transitionDelay: `${getRandomDelay()}s`,
+            }}
+          >
+            {extraSquareInfo.up.map((obj) => {
+              return (
+                <div id="StateValueUp" className={`${classes.InfoBubble}`}>
+                  {obj.value}
+                </div>
+              );
+            })}
+          </Box>
+          <Box
+            id="ValuesDown"
+            className={`${classes.InfoBoxHorizontal} ${classes.InfoBox}`}
+            style={{
+              left: `${
+                (localSelectedSquare -
+                  Math.floor(localSelectedSquare / mapSize) * mapSize) *
+                SquareSize
+              }px`,
+              top: `${
+                SquareSize +
+                -15 +
+                Math.floor(localSelectedSquare / mapSize) * SquareSize
+              }px`,
+              transitionDelay: `${getRandomDelay()}s`,
+            }}
+          >
+            {extraSquareInfo.down.map((obj) => {
+              return (
+                <div id="StateValueUp" className={`${classes.InfoBubble}`}>
+                  {obj.value}
+                </div>
+              );
+            })}
+          </Box>
+          <Box
+            id="ValuesRight"
+            className={`${classes.InfoBoxVertical} ${classes.InfoBox}`}
+            style={{
+              left: `${
+                SquareSize +
+                -15 +
+                (localSelectedSquare -
+                  Math.floor(localSelectedSquare / mapSize) * mapSize) *
+                  SquareSize
+              }px`,
+              top: `${
+                Math.floor(localSelectedSquare / mapSize) * SquareSize
+              }px`,
+              transitionDelay: `${getRandomDelay()}s`,
+            }}
+          >
+            {extraSquareInfo.right.map((obj) => {
+              return (
+                <div id="StateValueUp" className={`${classes.InfoBubble}`}>
+                  {obj.value}
+                </div>
+              );
+            })}
+          </Box>
+          <Box
+            id="ValuesLeft"
+            className={`${classes.InfoBoxVertical} ${classes.InfoBox}`}
+            style={{
+              left: `${
+                -28 +
+                (localSelectedSquare -
+                  Math.floor(localSelectedSquare / mapSize) * mapSize) *
+                  SquareSize
+              }px`,
+              top: `${
+                Math.floor(localSelectedSquare / mapSize) * SquareSize
+              }px`,
+              transitionDelay: `${getRandomDelay()}s`,
+            }}
+          >
+            {extraSquareInfo.left.map((obj) => {
+              return (
+                <div id="StateValueUp" className={`${classes.InfoBubble}`}>
+                  {obj.value}
+                </div>
+              );
+            })}
+          </Box>
         </div>
       </div>
     </Environment>
