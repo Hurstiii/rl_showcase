@@ -61,6 +61,8 @@ export interface Props {
   setHandleSimulate: React.Dispatch<
     React.SetStateAction<((e: React.MouseEvent) => void) | undefined>
   >;
+  saveTimestepState: (context: TestAgentState, episode: number) => void;
+  setWorkingTimestep: React.Dispatch<React.SetStateAction<number>>;
 }
 
 const TestAgent: React.FC<Props> = (props) => {
@@ -82,6 +84,8 @@ const TestAgent: React.FC<Props> = (props) => {
     discount,
     alpha,
     setAgentInit,
+    saveTimestepState,
+    setWorkingTimestep,
   } = props;
 
   // const {
@@ -238,7 +242,7 @@ const TestAgent: React.FC<Props> = (props) => {
   const newEpisode = useCallback(
     (context: TestAgentState) => {
       console.log("new Episode Effect ----------------------------------");
-      setAgentState({
+      const newState = {
         ...context,
         T: Infinity,
         t: 0,
@@ -246,11 +250,14 @@ const TestAgent: React.FC<Props> = (props) => {
         S: [0],
         A: [piAction(0, agentState.pi)],
         R: [0],
-      });
+      };
+      setAgentState(newState);
       // add delay to give it time to be seen on last square before resetting.
       setTimeout(() => {
         Reset();
       }, speed);
+
+      return newState;
     },
     [Reset, agentState, piAction, setAgentState, speed]
   );
@@ -339,6 +346,8 @@ const TestAgent: React.FC<Props> = (props) => {
       setEpisodes={setEpisodes}
       setHandleStep={setHandleStep}
       setHandleSimulate={setHandleSimulate}
+      saveTimestepState={saveTimestepState}
+      setWorkingTimestep={setWorkingTimestep}
     ></Agent>
   );
 };
