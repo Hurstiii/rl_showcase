@@ -1,7 +1,10 @@
-import React from "react";
+import React, { Ref } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import styled, { css } from "styled-components";
 import Environment from "./Environment";
+import { sampleUniformAction } from "../utils/Utils";
+import { Box, Hidden, makeStyles, Tooltip } from "@material-ui/core";
+import { relative } from "path";
 
 /**
  * Enum actions for the environment to given them more readability/meaning than just numbers.
@@ -13,37 +16,77 @@ enum Actions {
   Left,
 }
 
+const SquareSize = 150;
+const AgentSize = SquareSize / 2;
+const InfoSize = 38;
+
 /**
  * Styled components.
  */
 const MapWrapper = styled.div`
   display: grid;
-  grid: repeat(4, 100px) / repeat(4, 100px);
+  grid: repeat(4, ${SquareSize}px) / repeat(4, ${SquareSize}px);
   align-items: center;
   justify-items: center;
-  flex-basis: 400px;
 `;
 const MapSquare = styled.div`
-  width: 90%;
-  height: 90%;
   display: flex;
   justify-content: center;
   align-items: center;
-  ${({ type }: { type: "Hole" | "Ice" | "Goal" }) => {
-    if (type === "Hole")
-      return css`
-        background: #457b9d;
-      `;
-    else if (type === "Goal")
-      return css`
-        background: #e3b23c;
-      `;
-    else
-      return css`
-        background: #a8dadc;
-      `;
+  transition: all ease-out 0.15s;
+  ${({
+    type,
+    selected,
+  }: {
+    type: "Hole" | "Ice" | "Goal";
+    selected: boolean;
+  }) => {
+    var background;
+    if (type === "Hole") background = "#457b9d";
+    else if (type === "Goal") background = "#e3b23c";
+    else background = "#a8dadc";
+
+    return css`
+      ${background ? `background: ${background}` : ``};
+      ${selected
+        ? `box-shadow: -7px 7px 1px -1px rgba(0, 0, 0, 0.1); width: 95%; height: 95%;`
+        : `box-shadow: -5px 5px 1px -1px rgba(0, 0, 0, 0.1); width: 90%; height: 90%;`}
+    `;
   }};
 `;
+
+const useStyles = makeStyles({
+  InfoBubble: {
+    width: `${InfoSize}px`,
+    height: `${InfoSize}px`,
+    background: "#ffffff66",
+    borderRadius: "50%",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    fontSize: "0.8rem",
+    fontWeight: 300,
+  },
+  InfoBox: {
+    position: "absolute",
+    justifyContent: "center",
+    display: "flex",
+    overflow: "hidden",
+    transition: "opacity 0.5s ease,left 0.1s ease-in-out, top 0.1s ease-in-out",
+  },
+  InfoBoxHorizontal: {
+    maxWidth: `${SquareSize}px`,
+    width: `${SquareSize}px`,
+    height: `${InfoSize}px`,
+    flexDirection: "row",
+  },
+  InfoBoxVertical: {
+    maxHeight: `${SquareSize}px`,
+    height: `${SquareSize}px`,
+    width: `${InfoSize}px`,
+    flexDirection: "column",
+  },
+});
 
 /**
  * Props for the FrozenLake environment.
@@ -52,6 +95,36 @@ interface Props {
   mapSize?: 4;
   p?: number;
   isSlippery?: boolean;
+  setStep: React.Dispatch<
+    React.SetStateAction<
+      ((action: number) => [number, number, boolean, Object]) | undefined
+    >
+  >;
+  setActionSpace: React.Dispatch<React.SetStateAction<number[] | undefined>>;
+  setStateSpace: React.Dispatch<React.SetStateAction<number[] | undefined>>;
+  setReset: React.Dispatch<React.SetStateAction<(() => void) | undefined>>;
+  speed: number;
+  setSelectedSquare: React.Dispatch<React.SetStateAction<number>>;
+  extraSquareInfo: {
+    up: {
+      label: string;
+      value: string | undefined;
+    }[];
+    right: {
+      label: string;
+      value: string | undefined;
+    }[];
+    down: {
+      label: string;
+      value: string | undefined;
+    }[];
+    left: {
+      label: string;
+      value: string | undefined;
+    }[];
+  };
+  currentSquare: number;
+  setCurrentSquare: React.Dispatch<React.SetStateAction<number>>;
 }
 
 /**
@@ -60,13 +133,25 @@ interface Props {
  */
 const FrozenLake: React.FC<Props> = ({
   mapSize = 4,
-  p = 0.8,
-  isSlippery = true,
+  isSlippery = false,
+  setStep,
+  setActionSpace,
+  setStateSpace,
+  setReset,
+  speed,
+  setSelectedSquare,
+  extraSquareInfo,
+  currentSquare,
+  setCurrentSquare,
 }) => {
-  const action_space = [0, 1, 2, 3]; // all possible actions
+  const classes = useStyles();
+
+  const action_space = useMemo(() => [0, 1, 2, 3], []); // all possible actions
   //prettier-ignore
-  const observation_space = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] // all possible states
-  const [currentSquare, setCurrentSquare] = useState(0); // current state
+  const observation_space = useMemo(() => [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], []) // all possible states
+
+  const [localSelectedSquare, setLocalSelectedSquare] = useState(0);
+  const [hideExtraInfo, setHideExtraInfo] = useState(false);
 
   // prettier-ignore
   const map = useMemo(() => ['F', 'F', 'F', 'F',
@@ -74,10 +159,10 @@ const FrozenLake: React.FC<Props> = ({
                 'F', 'F', 'F', 'F',
                 'F', 'F', 'F', 'G'], [])
   const [done, setDone] = useState(false);
-  console.log("FrozenLake re-rendered");
+
+  // console.log("FrozenLake re-rendered");
 
   const [agentAnimDuraction, setAgentAnimDuration] = useState(0.1);
-  const [speed, setSpeed] = useState(100);
 
   /**
    * Convert a map index to a row and column
@@ -113,7 +198,23 @@ const FrozenLake: React.FC<Props> = ({
 
   const Move = useCallback(
     (square: number, action: number): number => {
+      /**
+       * Chance to take a different action if environment is slippery.
+       */
+      if (isSlippery) {
+        console.log(`Slippery action choice`);
+        let actions = [
+          (action - 1) % action_space.length,
+          action,
+          (action + 1) % action_space.length,
+        ];
+        action = sampleUniformAction(actions);
+      }
+
       var newState = square;
+      /**
+       * Make move.
+       */
       if (InMap(square, action)) {
         switch (action) {
           case Actions.Up:
@@ -137,7 +238,7 @@ const FrozenLake: React.FC<Props> = ({
       }
       return newState;
     },
-    [InMap, mapSize]
+    [isSlippery, InMap, action_space.length, mapSize, setCurrentSquare]
   );
 
   /**
@@ -181,27 +282,38 @@ const FrozenLake: React.FC<Props> = ({
   /**
    * Reset the enviroment to the starting values & set reset to trigger the agent to reset for new episode.
    */
-  const Reset = () => {
+  const Reset = useCallback(() => {
     console.log(`-------- Resetting the Enviroment -----------`);
     setCurrentSquare(0);
     setDone(false);
-  };
-
-  const handleSpeedChange = (
-    e: React.MouseEvent<HTMLButtonElement, MouseEvent>
-  ) => {
-    if (e.currentTarget.id === "increase-speed") {
-      console.log(`increasing speed`);
-      setSpeed(speed + 20);
-    } else if (e.currentTarget.id === "decrease-speed") {
-      console.log(`decreasing speed`);
-      setSpeed(speed - 20);
-    }
-  };
+  }, []);
 
   useEffect(() => {
     setAgentAnimDuration(speed / 1000);
   }, [speed]);
+
+  /**
+   * Pass values back to the parent with callbacks and state for the agent.
+   */
+  useEffect(() => {
+    setActionSpace(action_space);
+  }, [action_space, setActionSpace]);
+
+  useEffect(() => {
+    setStateSpace(observation_space);
+  }, [observation_space, setStateSpace]);
+
+  useEffect(() => {
+    setStep(() => Step);
+  }, [Step, setStep]);
+
+  useEffect(() => {
+    setReset(() => Reset);
+  }, [Reset, setReset]);
+
+  const getRandomDelay = () => {
+    return Math.random() * 0.0;
+  };
 
   return (
     <Environment
@@ -214,51 +326,192 @@ const FrozenLake: React.FC<Props> = ({
       {/** The render/visual for this environment */}
       <div
         style={{
-          display: "flex",
-          width: "100%",
-          height: "100%",
+          position: "relative",
+          height: "max-content",
         }}
       >
+        <MapWrapper>
+          {map.map((v, i) => {
+            if (v === "H")
+              return (
+                <MapSquare
+                  key={i}
+                  type="Hole"
+                  onClick={() => {
+                    if (localSelectedSquare === i) {
+                      setHideExtraInfo((hideExtraInfo) => !hideExtraInfo);
+                    } else {
+                      setHideExtraInfo(false);
+                      setSelectedSquare(i);
+                      setLocalSelectedSquare(i);
+                    }
+                  }}
+                  selected={localSelectedSquare === i}
+                />
+              );
+            else if (v === "G")
+              return (
+                <MapSquare
+                  key={i}
+                  type="Goal"
+                  onClick={() => {
+                    if (localSelectedSquare === i) {
+                      setHideExtraInfo((hideExtraInfo) => !hideExtraInfo);
+                    } else {
+                      setHideExtraInfo(false);
+                      setSelectedSquare(i);
+                      setLocalSelectedSquare(i);
+                    }
+                  }}
+                  selected={localSelectedSquare === i}
+                />
+              );
+            else
+              return (
+                <MapSquare
+                  key={i}
+                  type="Ice"
+                  onClick={() => {
+                    if (localSelectedSquare === i) {
+                      setHideExtraInfo((hideExtraInfo) => !hideExtraInfo);
+                    } else {
+                      setHideExtraInfo(false);
+                      setSelectedSquare(i);
+                      setLocalSelectedSquare(i);
+                    }
+                  }}
+                  selected={localSelectedSquare === i}
+                />
+              );
+          })}
+        </MapWrapper>
         <div
+          id="Agent"
           style={{
-            position: "relative",
+            width: `${AgentSize}px`,
+            height: `${AgentSize}px`,
+            background: "red",
+            borderRadius: "50%",
+            transitionProperty: "all",
+            transitionDuration: `${agentAnimDuraction}s`,
+            transitionTimingFunction: "ease",
+            position: "absolute",
+            boxShadow: "-5px 5px 1px -1px rgba(0, 0, 0, 0.2)",
+            left: `${
+              (currentSquare - Math.floor(currentSquare / mapSize) * mapSize) *
+                SquareSize +
+              AgentSize / 2
+            }px`,
+            top: `${
+              Math.floor(currentSquare / mapSize) * SquareSize + AgentSize / 2
+            }px`,
+          }}
+        ></div>
+        <Box
+          id="ValuesUp"
+          className={`${classes.InfoBoxHorizontal} ${classes.InfoBox}`}
+          style={{
+            opacity: hideExtraInfo ? 0 : 1,
+            left: `${
+              (localSelectedSquare -
+                Math.floor(localSelectedSquare / mapSize) * mapSize) *
+              SquareSize
+            }px`,
+            top: `${
+              -28 + Math.floor(localSelectedSquare / mapSize) * SquareSize
+            }px`,
+            transitionDelay: `${getRandomDelay()}s`,
           }}
         >
-          <MapWrapper>
-            {map.map((v, i) => {
-              if (v === "H") return <MapSquare key={i} type="Hole" />;
-              else if (v === "G") return <MapSquare key={i} type="Goal" />;
-              else return <MapSquare key={i} type="Ice" />;
-            })}
-          </MapWrapper>
-          <div
-            style={{
-              width: "50px",
-              height: "50px",
-              background: "red",
-              borderRadius: "50%",
-              transitionProperty: "all",
-              transitionDuration: `${agentAnimDuraction}s`,
-              transitionTimingFunction: "ease",
-              position: "absolute",
-              left: `${
-                (currentSquare -
-                  Math.floor(currentSquare / mapSize) * mapSize) *
-                  100 +
-                25
-              }px`,
-              top: `${Math.floor(currentSquare / mapSize) * 100 + 25}px`,
-            }}
-          ></div>
-          <div>{currentSquare}</div>
-        </div>
-        <button id="decrease-speed" onClick={handleSpeedChange}>
-          - Speed
-        </button>
-        <button id="increase-speed" onClick={handleSpeedChange}>
-          + Speed
-        </button>
-        <div>{speed}</div>
+          {extraSquareInfo.up.map((obj, i) => {
+            return (
+              <Tooltip key={i} title={obj.label}>
+                <div id="StateValueUp" className={`${classes.InfoBubble}`}>
+                  {obj.value}
+                </div>
+              </Tooltip>
+            );
+          })}
+        </Box>
+        <Box
+          id="ValuesDown"
+          className={`${classes.InfoBoxHorizontal} ${classes.InfoBox}`}
+          style={{
+            opacity: hideExtraInfo ? 0 : 1,
+            left: `${
+              (localSelectedSquare -
+                Math.floor(localSelectedSquare / mapSize) * mapSize) *
+              SquareSize
+            }px`,
+            top: `${
+              SquareSize +
+              -15 +
+              Math.floor(localSelectedSquare / mapSize) * SquareSize
+            }px`,
+            transitionDelay: `${getRandomDelay()}s`,
+          }}
+        >
+          {extraSquareInfo.down.map((obj, i) => {
+            return (
+              <Tooltip key={i} title={obj.label}>
+                <div id="StateValueUp" className={`${classes.InfoBubble}`}>
+                  {obj.value}
+                </div>
+              </Tooltip>
+            );
+          })}
+        </Box>
+        <Box
+          id="ValuesRight"
+          className={`${classes.InfoBoxVertical} ${classes.InfoBox}`}
+          style={{
+            opacity: hideExtraInfo ? 0 : 1,
+            left: `${
+              SquareSize +
+              -15 +
+              (localSelectedSquare -
+                Math.floor(localSelectedSquare / mapSize) * mapSize) *
+                SquareSize
+            }px`,
+            top: `${Math.floor(localSelectedSquare / mapSize) * SquareSize}px`,
+            transitionDelay: `${getRandomDelay()}s`,
+          }}
+        >
+          {extraSquareInfo.right.map((obj, i) => {
+            return (
+              <Tooltip key={i} title={obj.label}>
+                <div id="StateValueUp" className={`${classes.InfoBubble}`}>
+                  {obj.value}
+                </div>
+              </Tooltip>
+            );
+          })}
+        </Box>
+        <Box
+          id="ValuesLeft"
+          className={`${classes.InfoBoxVertical} ${classes.InfoBox}`}
+          style={{
+            opacity: hideExtraInfo ? 0 : 1,
+            left: `${
+              -28 +
+              (localSelectedSquare -
+                Math.floor(localSelectedSquare / mapSize) * mapSize) *
+                SquareSize
+            }px`,
+            top: `${Math.floor(localSelectedSquare / mapSize) * SquareSize}px`,
+            transitionDelay: `${getRandomDelay()}s`,
+          }}
+        >
+          {extraSquareInfo.left.map((obj, i) => {
+            return (
+              <Tooltip key={i} title={obj.label}>
+                <div id="StateValueUp" className={`${classes.InfoBubble}`}>
+                  {obj.value}
+                </div>
+              </Tooltip>
+            );
+          })}
+        </Box>
       </div>
     </Environment>
   );

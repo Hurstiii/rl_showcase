@@ -1,11 +1,23 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { TestAgentState } from "./TestAgent";
 
 export interface Props {
-  newEpisode: () => void; // a callback to reset the agent for a new episode.
+  newEpisode: (context: TestAgentState) => TestAgentState; // a callback to reset the agent for a new episode.
   init: () => void; // a callback to intialise the agent. Called onComponentDidMount.
-  learn: () => boolean; // the main callback that will implement the aglorithm of the agent. Called when step button pressed etc...
+  learn: () => { done: boolean; context: TestAgentState }; // the main callback that will implement the aglorithm of the agent. Called when step button pressed etc...
   speed: number; // the delay between agent actions.
-  timeStep: number;
+  simulating: boolean;
+  setSimulating: React.Dispatch<React.SetStateAction<boolean>>;
+  episodes: number;
+  setEpisodes: React.Dispatch<React.SetStateAction<number>>;
+  setHandleStep: React.Dispatch<
+    React.SetStateAction<((e: React.MouseEvent) => void) | undefined>
+  >;
+  setHandleSimulate: React.Dispatch<
+    React.SetStateAction<((e: React.MouseEvent) => void) | undefined>
+  >;
+  saveTimestepState: (context: TestAgentState, episode: number) => void;
+  setWorkingTimestep: React.Dispatch<React.SetStateAction<number>>;
 }
 
 /**
@@ -17,32 +29,63 @@ export const Agent: React.FC<Props> = ({
   init,
   learn,
   speed,
-  timeStep,
+  simulating,
+  setSimulating,
+  episodes,
+  setEpisodes,
+  setHandleStep,
+  setHandleSimulate,
+  saveTimestepState,
+  setWorkingTimestep,
+  children,
 }) => {
-  const [simulating, setSimulating] = useState(false); // whether the environment is simulating or not.
   const interval = useRef<NodeJS.Timeout | null>(null); // remembers the interval that was set.
-  const [episodes, setEpisodes] = useState(1); // number of episodes.
 
   /**
    * Handles a click of the step button.
    * @param e MouseEvent of the click.
    */
-  const handleSimulate = (e: React.MouseEvent) => {
-    let newSimulating = !simulating;
-    setSimulating(newSimulating);
-  };
+  const handleSimulate = useCallback(
+    (e: React.MouseEvent) => {
+      setSimulating((simulating) => !simulating);
+    },
+    [setSimulating]
+  );
+
+  const tickTimestep = useCallback(() => {
+    const { done, context } = learn();
+    if (done) {
+      let newContext = newEpisode(context);
+      let newEpisodes = episodes + 1;
+      setEpisodes(newEpisodes);
+      console.log("saving the initial state for the new episode");
+      // saveTimestepState(newContext, newEpisodes, currentSquare);
+      // setWorkingTimestep(0);
+    } else {
+      console.log("saving the state for a timestep");
+      // saveTimestepState(context, episodes);
+      // setWorkingTimestep(context.t);
+    }
+  }, [
+    episodes,
+    learn,
+    newEpisode,
+    saveTimestepState,
+    setEpisodes,
+    setWorkingTimestep,
+  ]);
 
   /**
    * Handles the click of the simulate button.
    * @param e MouseEvent of the click.
    */
-  const handleStep = (e: React.MouseEvent) => {
-    if (simulating) return;
-    if (learn()) {
-      newEpisode();
-      setEpisodes(episodes + 1);
-    }
-  };
+  const handleStep = useCallback(
+    (e: React.MouseEvent) => {
+      if (simulating) return;
+      tickTimestep();
+    },
+    [simulating, tickTimestep]
+  );
 
   /**
    * basically onComponentDidMount
@@ -58,12 +101,7 @@ export const Agent: React.FC<Props> = ({
   useEffect(() => {
     if (simulating) {
       interval.current = setInterval(() => {
-        if (learn()) {
-          if (simulating) {
-            newEpisode();
-            setEpisodes(episodes + 1);
-          }
-        }
+        tickTimestep();
       }, speed);
 
       return () => {
@@ -72,16 +110,17 @@ export const Agent: React.FC<Props> = ({
         }
       };
     }
-  }, [simulating, learn, speed, newEpisode, episodes]);
+  }, [simulating, speed, tickTimestep]);
 
-  return (
-    <div>
-      <button onClick={handleStep}>Step</button>
-      <button onClick={handleSimulate}>Simulate</button>
-      <h2>ep={episodes}</h2>
-      <h2>t={timeStep}</h2>
-    </div>
-  );
+  useEffect(() => {
+    setHandleStep(() => handleStep);
+  }, [setHandleStep, handleStep]);
+
+  useEffect(() => {
+    setHandleSimulate(() => handleSimulate);
+  }, [setHandleSimulate, handleSimulate]);
+
+  return <>{children}</>;
 };
 
 export default Agent;

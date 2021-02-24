@@ -1,14 +1,32 @@
+import { createMuiTheme, MuiThemeProvider, Paper } from "@material-ui/core";
+import { blue, green, purple, red } from "@material-ui/core/colors";
 import React, { useState } from "react";
+import { ThemeProvider } from "styled-components";
 import "./App.css";
-import FrozenLake from "./components/FrozenLake";
-import TestAgent from "./components/TestAgent";
+import Simulation from "./components/Simulation";
+import { AppTheme } from "./components/Theme";
+
+const theme = AppTheme();
 
 function App() {
   return (
-    <div className="App">
-      <header className="App-header"></header>
-      <FrozenLake mapSize={4} />
-    </div>
+    <MuiThemeProvider theme={theme}>
+      <div className="App">
+        <Paper
+          elevation={2}
+          className="App-header"
+          style={{
+            width: "100%",
+            minHeight: "50px",
+            backgroundColor: "#6889f2",
+          }}
+          square={true}
+        ></Paper>
+        <main className="showcase">
+          <Simulation />
+        </main>
+      </div>
+    </MuiThemeProvider>
   );
 }
 
